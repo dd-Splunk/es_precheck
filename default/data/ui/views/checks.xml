@@ -1,0 +1,474 @@
+<dashboard hideFilters="true" theme="dark">
+  <label>Health</label>
+  <!-- Two Dummy pannels below are not visible. Searches in the pannels are used to determine if there is a minimal number of CIM-compliant data sources available for the ES app to populate its dashboards-->
+  <!-- Pannel with a warning is displayed if no CIM add-on is installed-->
+  <!-- Pannel with a warning is displayed if no cufient number of CIM-compliant data sources available-->
+  <row>
+    <panel depends="$dummy_token$">
+      <title>Hidden Panel Checking for CIM Add-on</title>
+      <table>
+        <search>
+          <done>
+            <condition match="'result.count' == &quot;0&quot;">
+              <set token="cim_add-on_missing">1</set>
+            </condition>
+          </done>
+          <query>| rest /services/apps/local splunk_server=local | search title="Splunk_SA_CIM" | stats count</query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$dummy_token$">
+      <title>Hidden Panel Checking for Basic CIM-compliant Accelerated Data Sources</title>
+      <table>
+        <search>
+          <done>
+            <condition match="'result.data_issue' &gt; 0">
+              <set token="data_quality_issue">1</set>
+            </condition>
+          </done>
+          <query>| tstats summariesonly=true allow_old_summaries=true count from datamodel=Authentication 
+| eval data_issue=if(count&gt;1,0,1) 
+| append 
+    [| tstats summariesonly=true allow_old_summaries=true count from datamodel=Network_Traffic.All_Traffic 
+    | eval  data_issue=if(count&gt;100,0,1)] 
+| stats sum(data_issue) as data_issue</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$cim_add-on_missing$">
+      <html>
+        <p>
+          <img src="/static/app/ES_App_for_Splunk/images/warning.png" width="45"/>
+        </p>
+        <h1 style="color:OrangeRed">If you see this message, you still need to install <a href="https://splunkbase.splunk.com/app/1621" target="_blank">Splunk Common Information Model (CIM) Add-on</a>
+        </h1>
+        <br/>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$data_quality_issue$">
+      <html>
+          <p>
+          <img src="/static/app/InfoSec_App_for_Splunk/images/warning.png" width="45"/>
+        </p>
+          <h1 style="color:OrangeRed">If you see this message, you still need to complete bringing your data into Splunk in a CIM-compliant way. Things to check:</h1>
+          <h2 style="color:OrangeRed">
+          <ul>
+            <li>You did not install CIM-compliant add-ons for your data sources (Windows Add-on, Palo Alto Networks Add-on, Symantec EP Add-on, etc.). Find add-ons for your data sources on <a href="https://splunkbase.splunk.com/apps/#/order/popular/type/addon" target="_blank">Splunkbase</a>
+            </li>
+            <li>You did not accelerte data models (Settings &gt; Data models; for each data model in the list below: Edit (in Actions column) &gt; Edit Acceleration &gt; Accelerate (checkbox) &gt; Save): 
+            <ul>
+              <li>Authentication</li>
+              <li>Change</li>
+              <li>Intrusion_Detection</li>
+              <li>Malware</li>
+              <li>Network_Sessions</li>
+              <li>Network_Traffic</li>
+              <li>Endpoint</li>
+              <li>Web</li>
+            </ul>
+            </li>
+            <li>You need to wait for data models to accelerate. This may take between 10 minutes and several hours depending on your data volumes.</li>
+            <li>Your data sourcetypes do not match what add-ons expect. Read installation instructions supplied with add-ons.</li>
+            <li>CIM add-ons are not available for your data or are not fully CIM-compliant. <a href="https://youtu.be/QTklD7OiN74" target="_blank">Make your data CIM compliant</a>
+            </li>
+          </ul>
+          </h2>
+          <h1 style="color:OrangeRed">The tables below show the number of events in the past 24 hours that the ES app can report on, and the data model acceleration status. If the majority of the rows are red, you still need to bring data in CIM-compliant way and/or accelerate data models.</h1>
+        <br/>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Data Models Used by ES App: Events in 24 Hours</title>
+      <table>
+        <title>If count = 0, check prerequisites in Help menu</title>
+        <search>
+          <query>| makeresults 
+| eval datamodels = `es-dm`
+| makemv delim=":" datamodels 
+| mvexpand datamodels 
+| map search="| tstats summariesonly=true allow_old_summaries=true count from datamodel=$$datamodels$$  | eval data_model=\"$$datamodels$$\"" maxsearches=30
+| rename count as events 
+| table data_model, events</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="count">
+          <colorPalette type="list">[#DC4E41,#F8BE34,#53A051]</colorPalette>
+          <scale type="threshold">1,100</scale>
+        </format>
+        <format type="number" field="count">
+          <option name="precision">0</option>
+          <option name="unit">events</option>
+        </format>
+        <format type="color" field="data_model">
+          <colorPalette type="map">{"CIM_Web (optional)":#999999,"CIM_Endpoint.Processes (optional)":#999999,"Network_Sessions.All_Sessions.VPN (optional)":#999999}</colorPalette>
+        </format>
+        <format type="number" field="events">
+          <option name="precision">0</option>
+        </format>
+        <format type="color" field="events">
+          <colorPalette type="list">[#DC4E41,#F8BE34,#53A051]</colorPalette>
+          <scale type="threshold">1,100</scale>
+        </format>
+      </table>
+    </panel>
+    <panel>
+      <title>Data Models Used by ES App: Details in 24 Hours</title>
+      <table>
+        <title>If count = 0, check prerequisites in Help menu</title>
+        <search>
+          <query>| makeresults 
+| eval datamodels = `es-dm`
+| makemv delim=":" datamodels 
+| mvexpand datamodels 
+| map search="| tstats summariesonly=true allow_old_summaries=true count from datamodel=$$datamodels$$ by index, sourcetype | appendpipe [ stats count | where count=0] | eval data_model=\"$$datamodels$$\"" maxsearches=30
+| rename count as events 
+| table data_model, events, index, sourcetype</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">9</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">false</option>
+        <format type="color" field="datamodel">
+          <colorPalette type="sharedList"></colorPalette>
+          <scale type="sharedCategory"></scale>
+        </format>
+        <format type="color" field="count">
+          <colorPalette type="list">[#DC4E41,#F8BE34,#53A051]</colorPalette>
+          <scale type="threshold">1,5</scale>
+        </format>
+        <format type="number" field="count">
+          <option name="precision">0</option>
+        </format>
+        <format type="color" field="events">
+          <colorPalette type="list">[#DC4E41,#F8BE34,#53A051]</colorPalette>
+          <scale type="threshold">1,10</scale>
+        </format>
+        <format type="number" field="events">
+          <option name="precision">0</option>
+        </format>
+      </table>
+    </panel>
+    <panel>
+      <title>Data Model Acceleration Status</title>
+      <table>
+        <title>All accelerated data models and their status</title>
+        <search>
+          <query>| rest /services/admin/summarization by_tstats=true count=0 
+| rename summary.complete as complete, summary.id as data_model 
+| eval data_model=replace(data_model,"DM_Splunk_SA_CIM_",""), complete=round((complete * 100),0) 
+| convert ctime(latest_time) AS latest_time
+| table data_model, complete</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="count">9</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <format type="color" field="complete(%)">
+          <colorPalette type="list">[#DC4E41,#DC4E41,#F8BE34,#53A051,#53A051]</colorPalette>
+          <scale type="threshold">0,90,99,100</scale>
+        </format>
+        <format type="number" field="complete">
+          <option name="precision">0</option>
+          <option name="unit">%</option>
+        </format>
+        <format type="color" field="complete">
+          <colorPalette type="list">[#DC4E41,#F8BE34,#53A051]</colorPalette>
+          <scale type="threshold">90,99</scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Events Received in 30 Days</title>
+      <single>
+        <search>
+          <query>| tstats count where `es-indexes`</query>
+          <earliest>-30d@d</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+          <refresh>1s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="height">85</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0xdc4e41","0x555"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="refresh.display">none</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Hosts Reporting in the Past Hour</title>
+      <single>
+        <search>
+          <query>| tstats dc(host) where `es-indexes`</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="height">85</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0xdc4e41","0x555"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Data Sources Collected</title>
+      <single>
+        <search>
+          <query>| tstats dc(source) where `es-indexes`</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="height">85</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0xdc4e41","0x555"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Accounts Monitored</title>
+      <single>
+        <search>
+          <query>| tstats summariesonly=t allow_old_summaries=t count from datamodel=Authentication by Authentication.user | stats dc(Authentication.user)</query>
+          <earliest>-7d@h</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="drilldown">none</option>
+        <option name="height">85</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0xdc4e41","0x555"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Data Sources in the Past 5 Minutes</title>
+      <chart>
+        <search>
+          <query>| tstats count where `es-indexes` by _time, sourcetype span=1s | timechart minspan=1s count by sourcetype</query>
+          <earliest>-5m</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+          <refresh>10s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">none</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Data Sources Breakdown</title>
+      <chart>
+        <search>
+          <query>| tstats count where `es-indexes` by sourcetype</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.001</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="height">215</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Data Sources in the Past 7 Days</title>
+      <chart>
+        <search>
+          <query>| tstats count as events  where `es-indexes` by _time, source span=1h | timechart span=1h max(events) by source useother=f</query>
+          <earliest>-7d@h</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">log</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.001</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+</dashboard>
