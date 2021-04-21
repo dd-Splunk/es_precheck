@@ -10,3 +10,6 @@ Lists all indexes to be searched for relevant data. By default all indexes are s
 **es-dm**
 Lists the relevant ES Datamodels to be included in the checks.
 
+
+
+This app is based on the work of Cynthia Li and Igor Gifrin authors of the [InfoSec App for Splunk](https://splunkbase.splunk.com/app/4240/). 
